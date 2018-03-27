@@ -119,20 +119,24 @@ class OmsApi:
         data = json.load( response )
         return data
 
-    @staticmethod
+    # @staticmethod
     def getMaxValue(self, fillData, field = None):
         """
         get the maximum value of a specified field
         """
-        fillNumValue = {}
+        maxField = [0,0,0]
         if field:
             for dict1 in fillData['data']:
-                fillNum = dict1['attributes']['fill_number']
-                fillNumValue[fillNum] = dict1['attributes'][field]
-            ordered_fillNumValue = collections.OrderedDict(sorted(fillNumValue.items(), key=lambda t: t[1], reverse=True))
-            results = fillNum, fillNumValue[fillNum]
-            print ordered_fillNumValue.items()[0]
-            return results
+                dict2 = dict1['attributes']
+                fillNum = dict2['fill_number']
+                value = dict2[field]
+                time_unf = dateutil.parser.parse(dict2['start_time'])
+                time = time_unf.strftime('%y/%m/%d %H:%M:%S')
+                tmp = [fillNum,value,time]
+                if maxField[1] < tmp[1]:
+                    maxField = tmp
+            print maxField
+            return maxField
         return {}
 
     @staticmethod
@@ -187,7 +191,7 @@ class OmsApi:
 
         return results
 
-    def getFillSummary(self, fillData, Fields = None)
+    def getFillSummary(self, fillData, Fields = None):
         """
         get the fill statistics as a dictionary
         """
@@ -216,10 +220,10 @@ if args.year:
               fields = ['fill_number','peak_lumi','peak_pileup','efficiency_lumi','bunches_target','start_stable_beam','start_time','end_time','to_ready_time','delivered_lumi,recorded_lumi']   )
     # print fills
     # print
-    # api.getMaxValue(fills,'bunches_target')
+    api.getMaxValue(fills,'bunches_target')
     # api.getMaxValue(fills,'delivered_lumi')
     # api.getMaxValue(fills,'peak_pileup')
-    api.getMaxValue(fills,'efficiency_lumi')
-    api.getMaxValue(fills,'recorded_lumi')
+    # api.getMaxValue(fills,'efficiency_lumi')
+    # api.getMaxValue(fills,'recorded_lumi')
     # api.getMaxValue(fills,'peak_lumi')
     # api.getLongestStableBeam(fills)
