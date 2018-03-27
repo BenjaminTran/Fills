@@ -8,13 +8,13 @@ import urllib
 import urllib2
 import json
 import dateutil.parser
+from pytz import timezone
 
 
 
 OMS_API_SERVER = 'http://cmsomsapi.cern.ch:8080/api/v1'
 
 def formatTimeDelta(timeDelta):
-    # seconds = timeDelta.total_seconds()
     d = {"D" : timeDelta.days}
     d["H"], rem = divmod(timeDelta.seconds, 3600)
     d["M"], d["S"] = divmod(rem, 60)
@@ -119,8 +119,8 @@ class OmsApi:
         data = json.load( response )
         return data
 
-    # @staticmethod
-    def getMaxValue(self, fillData, field = None):
+    @staticmethod
+    def getMaxValue(fillData, field = None):
         """
         get the maximum value of a specified field
         """
@@ -144,10 +144,7 @@ class OmsApi:
         """
         get the Longest time duration of stable beams and fastest turnaround
         """
-        fillNumDuration = {}
-        fillNumStable = {}
-        fillNumEnd = {}
-        fillNumFastest = {}
+        result = [0,datetime.timedelta(),0]
 
         for dict1 in fillData['data']:
             dict2 = dict1['attributes']
@@ -155,43 +152,57 @@ class OmsApi:
             time_stable_beam = dateutil.parser.parse(dict2['start_stable_beam'])
             time_start_fill = dateutil.parser.parse(dict2['start_time'])
             time_end_fill = dateutil.parser.parse(dict2['end_time'])
-            fillNumDuration[fillNum] = time_end_fill - time_stable_beam
+            duration = time_end_fill - time_stable_beam
+            tmp = [fillNum, duration, time_start_fill]
+            if result[1] < tmp[1]:
+                result = tmp
+
+        Duration = formatTimeDelta(result[1])
+        result[1] = Duration
+        result[2] = result[2].strftime('%Y/%m/%d %H:%M:%S')
+        print result
+        return result
+
+    @staticmethod
+    def getFastestTurnaround(fillData):
+        """
+        get the fastest turnaround time
+        """
+
+        # fillNumber, fillNumber for previous fill, turnaround time, start time, start time for previous fill
+        result = [0,0,datetime.timedelta(hours=99),0,0]
+
+        fillNumStable = {}
+        fillNumEnd = {}
+
+        for dict1 in fillData['data']:
+            dict2 = dict1['attributes']
+            fillNum = dict2['fill_number']
+            time_stable_beam = dateutil.parser.parse(dict2['start_stable_beam'])
+            time_end_fill = dateutil.parser.parse(dict2['end_time'])
+            time_start_fill = dateutil.parser.parse(dict2['start_time'])
             fillNumStable[fillNum] = time_stable_beam
             fillNumEnd[fillNum] = time_end_fill
 
-        ordered_fillNumDuration = collections.OrderedDict(sorted(fillNumDuration.items(), key=lambda t: t[1], reverse=True))
-        duration = formatTimeDelta(ordered_fillNumDuration.values()[0])
-        results_duration = fillNum, duration
-        results = [results_duration]
-        print str(duration)
-
-        # Now do the faststest turnaround time
         ordered_fillNumStable = collections.OrderedDict(sorted(fillNumStable.items()))
         ordered_fillNumEnd = collections.OrderedDict(sorted(fillNumEnd.items()))
 
-        for i, (fillNumber, start_time) in enumerate(ordered_fillNumStable.iteritems()):
+        for i, (fillNumber, times) in enumerate(ordered_fillNumStable.iteritems()):
             if fillNumber == ordered_fillNumStable.keys()[0]:
                 continue
-            time_previous_end_fill = ordered_fillNumEnd[ordered_fillNumStable.keys()[i-1]]
-            turnaround = start_time - time_previous_end_fill
-            fillNumFastest[fillNumber] = turnaround
+            prev_fillNumber = ordered_fillNumStable.keys()[i-1]
+            time_previous_end_fill = ordered_fillNumEnd[prev_fillNumber]
+            turnaround = times - time_previous_end_fill
+            tmp = [fillNumber, prev_fillNumber, turnaround, times, time_previous_end_fill]
+            if result[2] > tmp[2]:
+                result = tmp
+        result[2] = formatTimeDelta(result[2])
+        result[3] = result[3].strftime('%Y/%m/%d %H:%M:%S')
+        result[4] = result[4].strftime('%Y/%m/%d %H:%M:%S')
+        print result
 
-        ordered_fillNumFastest = collections.OrderedDict(sorted(fillNumFastest.items(), key=lambda t: t[1]))
-        fastest = formatTimeDelta(ordered_fillNumFastest.values()[0])
-        fillNumberLarger = ordered_fillNumFastest.keys()[0]
-        fillNumberSmaller = 0
-        for i, (key, value) in enumerate(ordered_fillNumStable.iteritems()):
-            if key == fillNumberLarger:
-                fillNumberSmaller = ordered_fillNumStable.keys()[i-1]
-                break
-
-        results_fastest = fillNumberSmaller, fillNumberLarger, fastest
-        results.append(results_fastest)
-        print fillNumberSmaller, fillNumberLarger, fastest
-
-        return results
-
-    def getFillSummary(self, fillData, Fields = None):
+    @staticmethod
+    def getFillSummary(fillData, Fields = None):
         """
         get the fill statistics as a dictionary
         """
@@ -220,10 +231,11 @@ if args.year:
               fields = ['fill_number','peak_lumi','peak_pileup','efficiency_lumi','bunches_target','start_stable_beam','start_time','end_time','to_ready_time','delivered_lumi,recorded_lumi']   )
     # print fills
     # print
-    api.getMaxValue(fills,'bunches_target')
+    #api.getMaxValue(fills,'bunches_target')
     # api.getMaxValue(fills,'delivered_lumi')
     # api.getMaxValue(fills,'peak_pileup')
     # api.getMaxValue(fills,'efficiency_lumi')
     # api.getMaxValue(fills,'recorded_lumi')
     # api.getMaxValue(fills,'peak_lumi')
     # api.getLongestStableBeam(fills)
+    api.getFastestTurnaround(fills)
