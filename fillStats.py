@@ -1,6 +1,5 @@
-#!/usr/bin/ python
-
-import fills
+import datetime
+import collections
 import dateutil.parser
 from pytz import timezone
 
@@ -10,19 +9,19 @@ class FillStats:
     """
 
     def __init__(self, fillData = None, Fields = None):
-    """
-    Construct fill summary object
-    fillData: response from OMS API
-    Fields: Selected fields for statistics calculation
-    """
-    if not fillData:
-        print "Please supply the result from OMS API."
-    else:
-        self.fillData = fillData
-    if not Fields:
-        print "Please supply a list of fields for statistics calculation"
-    else:
-        self.Fields = Fields
+        """
+        Construct fill summary object
+        fillData: response from OMS API
+        Fields: Selected fields for statistics calculation
+        """
+        if not fillData:
+            print "Please supply the result from OMS API."
+        else:
+            self.fillData = fillData
+        if not Fields:
+            print "Please supply a list of fields for statistics calculation"
+        else:
+            self.Fields = Fields
 
     @staticmethod
     def formatTimeDelta(timeDelta):
@@ -50,7 +49,7 @@ class FillStats:
                 fillNum = dict2['fill_number']
                 value = dict2[field]
                 time_unf = dateutil.parser.parse(dict2['start_time'])
-                time = formatDate(time_unf)
+                time = FillStats.formatDate(time_unf)
                 tmp = [fillNum,value,time]
                 if maxField[1] < tmp[1]:
                     maxField = tmp
@@ -79,10 +78,10 @@ class FillStats:
             if longest[1] < tmp[1]:
                 longest = tmp
 
-        Duration = formatTimeDelta(longest[1])
+        Duration = FillStats.formatTimeDelta(longest[1])
         result['fill_number'] = longest[0]
         result[field] = Duration
-        result['start_stable_beam'] = formatDate(longest[2])
+        result['start_stable_beam'] = FillStats.formatDate(longest[2])
         print result
         return result
 
@@ -122,25 +121,25 @@ class FillStats:
                 fastest = tmp
         result['fill_number'] = fastest[0]
         result['prev_fill_number'] = fastest[1]
-        result[field] = formatTimeDelta(fastest[2])
-        result['start_stable_beam'] = formatDate(fastest[3])
-        result['end_time'] = formatDate(fastest[4])
+        result[field] = FillStats.formatTimeDelta(fastest[2])
+        result['start_stable_beam'] = FillStats.formatDate(fastest[3])
+        result['end_time'] = FillStats.formatDate(fastest[4])
         print result
         return result
 
-    def getFillSummary(fillData, Fields = None):
+    def getFillSummary(self):
         """
         get the fill statistics as a dictionary
         """
         FillSummary = {}
-        if Fields:
-            for field in Fields:
+        if self.Fields:
+            for field in self.Fields:
                 if field == 'longest_stable_beam':
-                    FillSummary[field] = api.getLongestStableBeam(fillData, field)
+                    FillSummary[field] = self.getLongestStableBeam(self.fillData, field)
                 elif field == 'fastest_turnaround':
-                    FillSummary[field] = api.getFastestTurnaround(fillData, field)
+                    FillSummary[field] = self.getFastestTurnaround(self.fillData, field)
                 else:
-                    FillSummary[field] = api.getMaxValue(fillData, field)
-            return Fields
+                    FillSummary[field] = self.getMaxValue(self.fillData, field)
+            return FillSummary
         return {}
 
