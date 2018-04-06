@@ -1,4 +1,5 @@
 import datetime
+import copy
 import collections
 import dateutil.parser
 from pytz import timezone
@@ -8,7 +9,7 @@ class FillStats:
     Functions for calculating fill statistics
     """
 
-    def __init__(self, fillData = None, Fields = None):
+    def __init__(self, fillData = None, Fields = None, collType = 'ALL'):
         """
         Construct fill summary object
         fillData: response from OMS API
@@ -17,7 +18,8 @@ class FillStats:
         if not fillData:
             print "Please supply the result from OMS API."
         else:
-            self.fillData = fillData
+            fillData_copy = copy.deepcopy(fillData)
+            self.fillData = self.filterCollResponse(fillData_copy,collType)
         if not Fields:
             print "Please supply a list of fields for statistics calculation"
         else:
@@ -71,6 +73,8 @@ class FillStats:
         for dict1 in fillData['data']:
             dict2 = dict1['attributes']
             fillNum = dict2['fill_number']
+            if dict2['delivered_lumi'] == 0:
+                continue
             time_stable_beam = dateutil.parser.parse(dict2['start_stable_beam'])
             time_end_fill = dateutil.parser.parse(dict2['end_time'])
             duration = time_end_fill - time_stable_beam
@@ -81,7 +85,10 @@ class FillStats:
         Duration = FillStats.formatTimeDelta(longest[1])
         result['fill_number'] = longest[0]
         result[field] = Duration
-        result['start_stable_beam'] = FillStats.formatDate(longest[2])
+        if type(longest[2]) is not int:
+            result['start_stable_beam'] = FillStats.formatDate(longest[2])
+        else:
+            result['start_stable_beam'] = 0
         print result
         return result
 
@@ -92,7 +99,7 @@ class FillStats:
         """
 
         # fillNumber, fillNumber for previous fill, turnaround time, start time, start time for previous fill
-        fastest = [0,0,datetime.timedelta(hours=99),0,0]
+        fastest = [0,0,datetime.timedelta(hours=999),0,0]
         result = {}
 
         fillNumStable = {}
@@ -121,11 +128,32 @@ class FillStats:
                 fastest = tmp
         result['fill_number'] = fastest[0]
         result['prev_fill_number'] = fastest[1]
-        result[field] = FillStats.formatTimeDelta(fastest[2])
-        result['start_stable_beam'] = FillStats.formatDate(fastest[3])
-        result['end_time'] = FillStats.formatDate(fastest[4])
+        if fastest[2] < datetime.timedelta(hours=500):
+            result[field] = FillStats.formatTimeDelta(fastest[2])
+        else:
+            result[field] = ''
+        if type(fastest[3]) is not int:
+            result['start_stable_beam'] = FillStats.formatDate(fastest[3])
+        else:
+            result['start_stable_beam'] = 0
+        if type(fastest[4]) is not int:
+            result['end_time'] = FillStats.formatDate(fastest[4])
+        else:
+            result['end_time'] = 0
         print result
         return result
+
+    @staticmethod
+    def filterCollResponse(fillData, collision_type):
+        if collision_type == 'ALL':
+            return fillData
+        else:
+            fill_list = fillData['data']
+            for dict1 in fill_list[:]:
+                dict2 = dict1['attributes']
+                if(dict2['fill_type_runtime'] != collision_type):
+                    fillData['data'].remove(dict1)
+            return fillData
 
     def getFillSummary(self):
         """
