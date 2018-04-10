@@ -44,3 +44,5 @@ if(Updatedb.checkFillEnd(fills)):
     print "="*80
     FillStatistics_ProtonPB = FillStats(fills, SummaryFields, 'PROTONS_PB')
     Summary_ProtonPB = FillStatistics_ProtonPB.getFillSummary()
+
+    Updatedb.checkDBvalues()
