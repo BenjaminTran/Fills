@@ -52,13 +52,14 @@ class FillStats:
                 value = dict2[field]
                 time_unf = dateutil.parser.parse(dict2['start_time'])
                 time = FillStats.formatDate(time_unf)
-                tmp = [fillNum,value,time]
+                tmp = [fillNum,value,time_unf]
                 if maxField[1] < tmp[1]:
                     maxField = tmp
+            result['field'] = field
             result['fill_number'] = maxField[0]
-            result[field] = maxField[1]
+            result['value'] = maxField[1]
             result['start_time'] = maxField[2]
-            print result
+            # print result
             return result
         return {}
 
@@ -82,14 +83,17 @@ class FillStats:
             if longest[1] < tmp[1]:
                 longest = tmp
 
-        Duration = FillStats.formatTimeDelta(longest[1])
+        # Duration = FillStats.formatTimeDelta(longest[1])
+        Duration = longest[1].total_seconds()/3600
+        result['field'] = field
         result['fill_number'] = longest[0]
-        result[field] = Duration
+        result['value'] = Duration
         if type(longest[2]) is not int:
-            result['start_stable_beam'] = FillStats.formatDate(longest[2])
+            # result['start_stable_beam'] = FillStats.formatDate(longest[2])
+            result['start_time'] = longest[2]
         else:
-            result['start_stable_beam'] = 0
-        print result
+            result['start_time'] = 0
+        # print result
         return result
 
     @staticmethod
@@ -126,26 +130,30 @@ class FillStats:
             tmp = [fillNumber, prev_fillNumber, turnaround, times, time_previous_end_fill]
             if fastest[2] > tmp[2]:
                 fastest = tmp
+        result['field'] = field
         result['fill_number'] = fastest[0]
         result['prev_fill_number'] = fastest[1]
         if fastest[2] < datetime.timedelta(hours=500):
-            result[field] = FillStats.formatTimeDelta(fastest[2])
+            # result['value'] = FillStats.formatTimeDelta(fastest[2])
+            result['value'] = fastest[2].total_seconds()/3600
         else:
-            result[field] = ''
+            result['value'] = ''
         if type(fastest[3]) is not int:
-            result['start_stable_beam'] = FillStats.formatDate(fastest[3])
+            # result['start_stable_beam'] = FillStats.formatDate(fastest[3])
+            result['start_time'] = fastest[3]
         else:
-            result['start_stable_beam'] = 0
+            result['start_time'] = 0
         if type(fastest[4]) is not int:
-            result['end_time'] = FillStats.formatDate(fastest[4])
+            # result['end_time'] = FillStats.formatDate(fastest[4])
+            result['end_time'] = fastest[4]
         else:
             result['end_time'] = 0
-        print result
+        # print result
         return result
 
     @staticmethod
     def filterCollResponse(fillData, collision_type):
-        if collision_type == 'ALL':
+        if collision_type == 'ALL': # Deprecated but here if needed in the future
             return fillData
         else:
             fill_list = fillData['data']
@@ -159,15 +167,14 @@ class FillStats:
         """
         get the fill statistics as a dictionary
         """
-        FillSummary = {}
+        FillSummary = []
         if self.Fields:
             for field in self.Fields:
                 if field == 'longest_stable_beam':
-                    FillSummary[field] = self.getLongestStableBeam(self.fillData, field)
+                    FillSummary.append(self.getLongestStableBeam(self.fillData, field))
                 elif field == 'fastest_turnaround':
-                    FillSummary[field] = self.getFastestTurnaround(self.fillData, field)
+                    FillSummary.append(self.getFastestTurnaround(self.fillData, field))
                 else:
-                    FillSummary[field] = self.getMaxValue(self.fillData, field)
-            return FillSummary
-        return {}
+                    FillSummary.append(self.getMaxValue(self.fillData, field))
+        return FillSummary
 

@@ -5,7 +5,8 @@ import json
 
 
 
-OMS_API_SERVER = 'http://cmsomsapi.cern.ch:8080/api/v1'
+# OMS_API_SERVER = 'http://cmsomsapi.cern.ch:8080/api/v1'
+OMS_API_SERVER = 'http://cmswbmdev7.cms:9080/api/v1'
 
 
 
