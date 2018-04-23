@@ -50,7 +50,7 @@ class FillStats:
                 dict2 = dict1['attributes']
                 fillNum = dict2['fill_number']
                 value = dict2[field]
-                time_unf = dateutil.parser.parse(dict2['start_time'])
+                time_unf = dateutil.parser.parse(dict2['start_stable_beam'])
                 time = FillStats.formatDate(time_unf)
                 tmp = [fillNum,value,time_unf]
                 if maxField[1] < tmp[1]:
@@ -58,7 +58,7 @@ class FillStats:
             result['field'] = field
             result['fill_number'] = maxField[0]
             result['value'] = maxField[1]
-            result['start_time'] = maxField[2]
+            result['start_stable_beam'] = maxField[2]
             # print result
             return result
         return {}
@@ -90,9 +90,9 @@ class FillStats:
         result['value'] = Duration
         if type(longest[2]) is not int:
             # result['start_stable_beam'] = FillStats.formatDate(longest[2])
-            result['start_time'] = longest[2]
+            result['start_stable_beam'] = longest[2]
         else:
-            result['start_time'] = 0
+            result['start_stable_beam'] = 0
         # print result
         return result
 
@@ -114,7 +114,6 @@ class FillStats:
             fillNum = dict2['fill_number']
             time_stable_beam = dateutil.parser.parse(dict2['start_stable_beam'])
             time_end_fill = dateutil.parser.parse(dict2['end_time'])
-            time_start_fill = dateutil.parser.parse(dict2['start_time'])
             fillNumStable[fillNum] = time_stable_beam
             fillNumEnd[fillNum] = time_end_fill
 
@@ -153,7 +152,7 @@ class FillStats:
 
     @staticmethod
     def filterCollResponse(fillData, collision_type):
-        if collision_type == 'ALL': # Deprecated but here if needed in the future
+        if collision_type == 'ALL': # Do Not Use. Equivalent to finding the statistics regardless of collision type which is not a use case
             return fillData
         else:
             fill_list = fillData['data']

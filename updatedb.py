@@ -27,28 +27,31 @@ FillRequest2DBtableDict = {
         'longest_stable_beam' : 'longestfill_hours'}
 
 # def updateDBvalue(cursor, value, fillNum, date, rowID, tableName, columnName):
-def updateDBvalue(cursor, fillDict, rowID, tableName, columnName):
+def updateDBvalue(cursor, fillDict, rowID, collType, tableName, columnName):
     prompt_print = ''
 
     # Does not have datetime fields and has two fill fields
     if(columnName == 'fastest_beam_turnaround_hours'):
         updateColumns = [columnName, columnName + '_fill1',  columnName + '_fill2']
-        prompt = "UPDATE " + tableName + " SET " + updateColumns[0] + "=%s " + updateColumns[1] + "=%s " + updateColumns[2] + "=%s WHERE year =%s "
-        #cursor.execute(prompt, (fillDict['value'], fillDict['prev_fill_number'], fillDict['fill_number'], rowID))
+        # prompt = "UPDATE " + tableName + " SET " + updateColumns[0] + "=%s " + updateColumns[1] + "=%s " + updateColumns[2] + "=%s WHERE year =%s AND runtime_type_id =%s"
+        prompt = "UPDATE " + tableName + " SET " + updateColumns[0] + " = " + str(fillDict['value']) + " " + updateColumns[1] + " = " + str(fillDict['prev_fill_number']) + " " + updateColumns[2] + " = " + str(fillDict['fill_number']) + " WHERE year = " + str(rowID) + " AND runtime_type_id = " + str(collType)
+        #cursor.execute(prompt, (fillDict['value'], fillDict['prev_fill_number'], fillDict['fill_number'], rowID, collType))
         prompt_print = prompt
     elif(columnName == 'longestfill_hours'): # Does not have fill field or datetime field
-        prompt = "UPDATE " + tableName + " SET " + columnName + "=" + str(fillDict['value']) + " WHERE year = " + str(rowID)
+        prompt = "UPDATE " + tableName + " SET " + columnName + "=" + str(fillDict['value']) + " WHERE year = " + str(rowID) + " AND runtime_type_id = " + str(collType)
         #cursor.execute(prompt)
         prompt_print = prompt
     elif(columnName == 'peaklumi' or columnName == 'maxpileup' or columnName == 'maxbunches'): # has both fill and datetime fields
         updateColumns = [columnName, columnName + '_fill', columnName + '_time']
-        prompt = "UPDATE " + tableName + " SET " + updateColumns[0] + "=%s " + updateColumns[1] + "=%s " + updateColumns[2] + "=%s WHERE year =%s "
-        #cursor.execute(prompt, (fillDict['value'], fillDict['fill_number'], fillDict['start_time'], rowID))
+        # prompt = "UPDATE " + tableName + " SET " + updateColumns[0] + "=%s " + updateColumns[1] + "=%s " + updateColumns[2] + "=%s WHERE year =%s AND runtime_type_id =%s"
+        prompt = "UPDATE " + tableName + " SET " + updateColumns[0] + " = " + str(fillDict['value']) + " " + updateColumns[1] + " = " + str(fillDict['fill_number']) + " " + updateColumns[2] + " = " + str(fillDict['start_stable_beam']) + " WHERE year = " + str(rowID) + " AND runtime_type_id = " + str(collType)
+        #cursor.execute(prompt, (fillDict['value'], fillDict['fill_number'], fillDict['start_stable_beam'], rowID, collType))
         prompt_print = prompt
     else: # Does not have datetime field
         updateColumns = [columnName, columnName + '_fill']
-        prompt = "UPDATE " + tableName + " SET " + updateColumns[0] + "=%s " + updateColumns[1] + "=%s WHERE year =%s "
-        #cursor.execute(prompt, (fillDict['value'], fillDict['fill_number'], rowID))
+        # prompt = "UPDATE " + tableName + " SET " + updateColumns[0] + "=%s " + updateColumns[1] + "=%s WHERE year =%s AND runtime_type_id =%s"
+        prompt = "UPDATE " + tableName + " SET " + updateColumns[0] + " = " + str(fillDict['value']) + " " + updateColumns[1] + " = " + str(fillDict['fill_number']) + " WHERE year = " + str(rowID) + " AND runtime_type_id = " + str(collType)
+        #cursor.execute(prompt, (fillDict['value'], fillDict['fill_number'], rowID, collType))
         prompt_print = prompt
 
     print prompt_print
@@ -91,15 +94,26 @@ def checkFillEnd(fillData = None, interval = 5):
     currentTime = datetime.datetime.utcnow().replace(tzinfo=pytz.UTC)
     latestEndTime = currentTime + datetime.timedelta(0,60)
     mostRecentFillNum = 0
+    isEndTimeEmpty = False
 
     for dict1 in fillData['data']:
         dict2 = dict1['attributes']
         if(dict2['fill_number'] > mostRecentFillNum):
             mostRecentFillNum = dict2['fill_number']
-            latestEndTime = dateutil.parser.parse(dict2['end_time'])
+            if(dict2['end_time'] == None):
+                print "end_time is NoneType for most recent fill"
+                #reset latest end time
+                latestEndTime = currentTime + datetime.timedelta(0,60)
+                continue
+            else:
+                latestEndTime = dateutil.parser.parse(dict2['end_time'])
 
+    print "Most recent Fill Number is " + str(mostRecentFillNum)
     if(currentTime - latestEndTime > datetime.timedelta(minutes = interval)):
         return True
+    else:
+        print "Most recent Fill has not ended"
+        return False
 
 def checkAndUpdateDBvalues(fillSummary, year, collType):
     """
@@ -128,13 +142,18 @@ def checkAndUpdateDBvalues(fillSummary, year, collType):
     cursor = db.cursor()
     cursor.execute('select * from ' + table_row + ' where year = ' + str(year) + ' and runtime_type_id = ' + str(runtime_type_id))
     yearSummary = cursor.fetchone()
+    if(yearSummary == None):
+        print "no yearSummary"
+        return
     print "="*80
     print yearSummary
+    print "="*80
 
     # Now compare database values with new values
 
     for newDataDict in fillSummary:
         attributeName = FillRequest2DBtableDict[newDataDict['field']]
+        # print attributeName
         DBvalue = yearSummary[attributeName]
         fillValue = newDataDict['value']
         if(DBvalue is None or fillValue is None):
@@ -149,8 +168,9 @@ def checkAndUpdateDBvalues(fillSummary, year, collType):
         if(isEquivalent(fillValue, DBvalue, 1e-5)):
             print attributeName + ' does not need updating'
         else:
-            updateDBvalue(cursor, newDataDict, year, table_row, attributeName)
+            updateDBvalue(cursor, newDataDict, year, runtime_type_id, table_row, attributeName)
 
+    #con.commit()
     db.close()
 
 def UpdateFill(fillData, SummaryFields, collType, year):
@@ -159,7 +179,7 @@ def UpdateFill(fillData, SummaryFields, collType, year):
 
         FillStatistics = fillStats.FillStats(fillData, SummaryFields, collType)
         FillSummary = FillStatistics.getFillSummary()
-        print FillSummary
+        # print FillSummary
 
         checkAndUpdateDBvalues(FillSummary, year, collType)
 

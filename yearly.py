@@ -9,7 +9,7 @@ import datetime
 
 parser = argparse.ArgumentParser( description='python example script to get fill info from OMSAPI', formatter_class=argparse.ArgumentDefaultsHelpFormatter )
 parser.add_argument( '-y', '--year', type = int, help='get info for all fills of this year')
-parser.add_argument( '-c', '--collType', type = str, help='filter collision type: PROTONS, PROTONS_PB, PB, default=PROTONS', default='PROTONS')
+parser.add_argument( '-c', '--collType', type = str, help='filter collision type: ALL, PROTONS, PROTONS_PB, PB, default=ALL', default='ALL')
 parser.add_argument( "-s", "--server", help = "server URL, default=" + fills.OmsApi.defaultServer(), default=None )
 
 args = parser.parse_args()
@@ -26,5 +26,13 @@ if args.year:
     # print fills
     # print
 
-    # Acceptable collType names = PROTONS | PROTONS_PB | PB
-    updateDB.UpdateFill(fills, SummaryFields, args.collType, args.year)
+    # Acceptable collType names = ALL | PROTONS | PROTONS_PB | PB
+    if(args.collType == "ALL"):
+        print "="*10 + "PROTONS PROTONS PROTONS" + "="*10
+        updateDB.UpdateFill(fills, SummaryFields, "PROTONS", args.year)
+        print "="*10 + "PROTONS_PB PROTONS_PB PROTONS_PB" + "="*10
+        updateDB.UpdateFill(fills, SummaryFields, "PROTONS_PB", args.year)
+        print "="*10 + "PB PB PB" + "="*30
+        updateDB.UpdateFill(fills, SummaryFields, "PB", args.year)
+    else:
+        updateDB.UpdateFill(fills, SummaryFields, args.collType, args.year)
