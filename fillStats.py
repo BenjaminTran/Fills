@@ -1,7 +1,9 @@
+import pytz
 import datetime
 import copy
 import collections
 import dateutil.parser
+from dateutil.relativedelta import *
 from pytz import timezone
 
 class FillStats:
@@ -152,28 +154,129 @@ class FillStats:
 
     @staticmethod
     def filterCollResponse(fillData, collision_type):
-        if collision_type == 'ALL': # Do Not Use. Equivalent to finding the statistics regardless of collision type which is not a use case
-            return fillData
-        else:
-            fill_list = fillData['data']
-            for dict1 in fill_list[:]:
-                dict2 = dict1['attributes']
-                if(dict2['fill_type_runtime'] != collision_type):
-                    fillData['data'].remove(dict1)
-            return fillData
+        fill_list = fillData['data']
+        for dict1 in fill_list[:]:
+            dict2 = dict1['attributes']
+            if(dict2['fill_type_runtime'] != collision_type):
+                fillData['data'].remove(dict1)
+        return fillData
 
-    def getFillSummary(self):
+
+    def sumDay(self, date, field):
         """
-        get the fill statistics as a dictionary
+        Sum a field for a given day.
+        """
+        result = 0
+        dateUTC = date.replace(tzinfo=pytz.UTC)
+        for dict1 in self.fillData['data']:
+            dict2 = dict1['attributes']
+            end_time = dateutil.parser.parse(dict2['end_time']).replace(tzinfo=pytz.UTC)
+            begin_time = dateutil.parser.parse(dict2['start_stable_beam']).replace(tzinfo=pytz.UTC)
+            # if fill has started and ended the day before and after,
+            # then add 24 hours
+            if((begin_time.date() - dateUTC.date()).days == -1 and (end_time.date() - dateUTC.date()).days == 1):
+                    result += 24
+                    return result
+            # Fills ending or starting on the day
+            if(end_time.date() == dateUTC.date() or begin_time.date() == dateUTC.date()):
+                if('longest' in field and dict2['delivered_lumi'] > 0):
+                    beginning_day = datetime.datetime(dateUTC.year,dateUTC.month,dateUTC.day,0,0,0,0,pytz.UTC)
+                    ending_day = datetime.datetime(dateUTC.year,dateUTC.month,dateUTC.day,23,59,59,0,pytz.UTC)
+                    # Fill started the day before
+                    if((begin_time.date() - dateUTC.date()).days < 0):
+                        result += (end_time - beginning_day).total_seconds()/3600
+                        print str((end_time - beginning_day).total_seconds()/3600) + " " + str(dict2['fill_number'])
+
+                    # Fill ended the next day
+                    elif((end_time.date() - dateUTC.date()).days > 0):
+                        result += (ending_day - begin_time).total_seconds()/3600
+
+                        print str((ending_day - begin_time).total_seconds()/3600) + " " + str(dict2['fill_number'])
+                    # Fill started and ended the same day
+                    elif(end_time.date() == dateUTC.date() and begin_time.date() == dateUTC.date()):
+                        result += (end_time - begin_time).total_seconds()/3600
+                        print str((end_time - begin_time).total_seconds()/3600) + " " + str(dict2['fill_number'])
+                elif('recorded' in field):
+                    result += dict2['recorded_lumi']
+                else:
+                    result += dict2['delivered_lumi']
+
+        return result
+
+    def sumByInterval(self, begin, end, increment, field, year):
+        """
+        Calculate the given statistic by an increment(string or int) over a time period.
+        """
+        maxValue = 0
+        maxNumber = 0
+        Number = 1
+        # begin = datetime.datetime(year, 1, 1, 0, 0, 0, 0, pytz.UTC)
+        begin_UTC = begin.replace(tzinfo=pytz.UTC)
+        incrementalCheck = begin_UTC
+        timeIncrement = datetime.timedelta(days=0)
+        if(isinstance(increment,int)):
+            timeIncrement = datetime.timedelta(days=increment)
+        elif(isinstance(increment,basestring)):
+            if(increment == 'day'):
+                timeIncrement = datetime.timedelta(days=1)
+            elif(increment == 'week'):
+                timeIncrement = datetime.timedelta(weeks=1)
+            elif(increment == 'month'):
+                timeIncrement = relativedelta(days=1, day=31)
+
+        while(end.replace(tzinfo=pytz.UTC) - incrementalCheck).days > -1:
+            print (end.replace(tzinfo=pytz.UTC) - incrementalCheck).days
+            print "IC: " + str(incrementalCheck)
+            summedValue = 0
+            while(incrementalCheck + timeIncrement > begin_UTC):
+                print begin_UTC
+                # for dict1 in self.fillData['data']:
+                    # dict2 = dict1['attributes']
+                    # if((dateutil.parser.parse(dict2['end_time']).replace(tzinfo=pytz.UTC) - begin).days == 0):
+                summedValue += self.sumDay(begin_UTC,field)
+                print summedValue
+                begin_UTC += datetime.timedelta(days=1)
+            if(summedValue > maxValue):
+                maxValue = summedValue
+                maxNumber = Number
+            # print "Incrementing number"
+            Number += 1
+            incrementalCheck += timeIncrement
+
+        result = {'field' : field, 'Num' : maxNumber, 'value' : maxValue}
+
+        return result
+
+    def getDayIntervalSummary(self, year):
+        """
+        Calculate statistics for interval values
+        """
+        result_list = []
+        # result_list.append(self.sumByInterval(datetime.datetime(year,12,31,23,59,59,0), 'week', 'maxlumiweek', year))
+        # result_list.append(self.sumByInterval(datetime.datetime.today(), 'day', 'maxlumirecordedday', year))
+        # result_list.append(self.sumByInterval(datetime.datetime(year,1,1,0,0,0,0), datetime.datetime(year,12,31,23,59,59,0), 'day', 'longestday_hours', year))
+        # result_list.append(self.sumByInterval(datetime.datetime(year,1,1,0,0,0,0) + relativedelta(weekday=MO(1)), datetime.datetime(year,12,31,23,59,59,0), 'week', 'longestweek_hours', year))
+        result_list.append(self.sumByInterval(datetime.datetime(year,1,1,0,0,0,0), datetime.datetime(year,12,31,23,59,59,0), 'month', 'longestmonth_hours', year))
+
+        return result_list
+
+    def getFillSummary(self, otherFills = None):
+        """
+        get the fill statistics as a list of dictionaries. Must have the same structure as the API response
         """
         FillSummary = []
+        FillData = self.fillData
+
+        if otherFills:
+            FillData = otherFills
+
         if self.Fields:
             for field in self.Fields:
                 if field == 'longest_stable_beam':
-                    FillSummary.append(self.getLongestStableBeam(self.fillData, field))
+                    FillSummary.append(self.getLongestStableBeam(FillData, field))
                 elif field == 'fastest_turnaround':
-                    FillSummary.append(self.getFastestTurnaround(self.fillData, field))
+                    FillSummary.append(self.getFastestTurnaround(FillData, field))
                 else:
-                    FillSummary.append(self.getMaxValue(self.fillData, field))
+                    FillSummary.append(self.getMaxValue(FillData, field))
         return FillSummary
 

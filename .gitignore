@@ -1,3 +1,4 @@
 *.json
 *.pyc
 beau_response.py
+tmp/

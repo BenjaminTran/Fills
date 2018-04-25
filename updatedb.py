@@ -1,6 +1,4 @@
 import pytz
-import sqlite3
-import collections
 import datetime
 import dateutil.parser
 import sys
@@ -29,30 +27,68 @@ FillRequest2DBtableDict = {
 # def updateDBvalue(cursor, value, fillNum, date, rowID, tableName, columnName):
 def updateDBvalue(cursor, fillDict, rowID, collType, tableName, columnName):
     prompt_print = ''
+    if(columnName == 'longestday_hours'):
+        columnName = 'longestday'
+    elif(columnName == 'longestweek_hours'):
+        columnName = 'longestweek'
+    elif(columnName == 'longestmonth_hours'):
+        columnName = 'longestmonth'
+
 
     # Does not have datetime fields and has two fill fields
     if(columnName == 'fastest_beam_turnaround_hours'):
         updateColumns = [columnName, columnName + '_fill1',  columnName + '_fill2']
-        # prompt = "UPDATE " + tableName + " SET " + updateColumns[0] + "=%s " + updateColumns[1] + "=%s " + updateColumns[2] + "=%s WHERE year =%s AND runtime_type_id =%s"
         prompt = "UPDATE " + tableName + " SET " + updateColumns[0] + " = " + str(fillDict['value']) + " " + updateColumns[1] + " = " + str(fillDict['prev_fill_number']) + " " + updateColumns[2] + " = " + str(fillDict['fill_number']) + " WHERE year = " + str(rowID) + " AND runtime_type_id = " + str(collType)
-        #cursor.execute(prompt, (fillDict['value'], fillDict['prev_fill_number'], fillDict['fill_number'], rowID, collType))
         prompt_print = prompt
+        # prompt = "UPDATE " + tableName + " SET " + updateColumns[0] + "=%s " + updateColumns[1] + "=%s " + updateColumns[2] + "=%s WHERE year =%s AND runtime_type_id =%s"
+        #cursor.execute(prompt, (fillDict['value'], fillDict['prev_fill_number'], fillDict['fill_number'], rowID, collType))
+
     elif(columnName == 'longestfill_hours'): # Does not have fill field or datetime field
         prompt = "UPDATE " + tableName + " SET " + columnName + "=" + str(fillDict['value']) + " WHERE year = " + str(rowID) + " AND runtime_type_id = " + str(collType)
-        #cursor.execute(prompt)
         prompt_print = prompt
+        #cursor.execute(prompt)
+
     elif(columnName == 'peaklumi' or columnName == 'maxpileup' or columnName == 'maxbunches'): # has both fill and datetime fields
         updateColumns = [columnName, columnName + '_fill', columnName + '_time']
-        # prompt = "UPDATE " + tableName + " SET " + updateColumns[0] + "=%s " + updateColumns[1] + "=%s " + updateColumns[2] + "=%s WHERE year =%s AND runtime_type_id =%s"
         prompt = "UPDATE " + tableName + " SET " + updateColumns[0] + " = " + str(fillDict['value']) + " " + updateColumns[1] + " = " + str(fillDict['fill_number']) + " " + updateColumns[2] + " = " + str(fillDict['start_stable_beam']) + " WHERE year = " + str(rowID) + " AND runtime_type_id = " + str(collType)
-        #cursor.execute(prompt, (fillDict['value'], fillDict['fill_number'], fillDict['start_stable_beam'], rowID, collType))
         prompt_print = prompt
+        # prompt = "UPDATE " + tableName + " SET " + updateColumns[0] + "=%s " + updateColumns[1] + "=%s " + updateColumns[2] + "=%s WHERE year =%s AND runtime_type_id =%s"
+        #cursor.execute(prompt, (fillDict['value'], fillDict['fill_number'], fillDict['start_stable_beam'], rowID, collType))
+
+    elif(columnName == 'maxlumiday' or columnName == 'maxlumirecordedday'): # time interval values
+        updateColumns = [columnName, columnName + '_day']
+        prompt = "UPDATE " + tableName + " SET " + updateColumns[0] + "=" + str(fillDict['value']) + updateColumns[1] + "=" + str(fillDict['Num']) + " WHERE year = " + str(rowID) + " AND runtime_type_id = " + str(collType)
+        prompt_print = prompt
+        #prompt = "UPDATE " + tableName + " SET " + updateColumns[0] + "=%s" + updateColumns[1] + "=%s" + " WHERE year =%s AND runtime_type_id =%s "
+        # cursor.execute(prompt, (fillDict['value'], fillDict['Num'], rowID, collType))
+
+    elif(columnName == 'maxlumiweek' or columnName == 'maxlumirecordedweek'): # time interval values
+        updateColumns = [columnName, columnName + '_week']
+        prompt = "UPDATE " + tableName + " SET " + updateColumns[0] + "=" + str(fillDict['value']) + updateColumns[1] + "=" + str(fillDict['Num']) + " WHERE year = " + str(rowID) + " AND runtime_type_id = " + str(collType)
+        prompt_print = prompt
+        #prompt = "UPDATE " + tableName + " SET " + updateColumns[0] + "=%s" + updateColumns[1] + "=%s" + " WHERE year =%s AND runtime_type_id =%s "
+        # cursor.execute(prompt, (fillDict['value'], fillDict['Num'], rowID, collType))
+
+    elif(columnName == 'maxlumimonth' or columnName == 'maxlumirecordedmonth'): # time interval values
+        updateColumns = [columnName, columnName + '_month']
+        prompt = "UPDATE " + tableName + " SET " + updateColumns[0] + "=" + str(fillDict['value']) + updateColumns[1] + "=" + str(fillDict['Num']) + " WHERE year = " + str(rowID) + " AND runtime_type_id = " + str(collType)
+        prompt_print = prompt
+        #prompt = "UPDATE " + tableName + " SET " + updateColumns[0] + "=%s" + updateColumns[1] + "=%s" + " WHERE year =%s AND runtime_type_id =%s "
+        # cursor.execute(prompt, (fillDict['value'], fillDict['Num'], rowID, collType))
+
+    elif(columnName == 'longestday' or columnName == 'longestweek' or columnName == 'longestmonth'): # day interval values
+        updateColumns = [columnName, columnName + '_hours']
+        prompt = "UPDATE " + tableName + " SET " + updateColumns[0] + "=" + str(fillDict['Num']) + " " + updateColumns[1] + "=" + str(fillDict['value']) + " WHERE year = " + str(rowID) + " AND runtime_type_id = " + str(collType)
+        prompt_print = prompt
+        #prompt = "UPDATE " + tableName + " SET " + updateColumns[0] + "=%s" + updateColumns[1] + "=%s" + " WHERE year =%s AND runtime_type_id =%s "
+        # cursor.execute(prompt, (fillDict['Num'], fillDict['value'], rowID, collType))
+
     else: # Does not have datetime field
         updateColumns = [columnName, columnName + '_fill']
-        # prompt = "UPDATE " + tableName + " SET " + updateColumns[0] + "=%s " + updateColumns[1] + "=%s WHERE year =%s AND runtime_type_id =%s"
         prompt = "UPDATE " + tableName + " SET " + updateColumns[0] + " = " + str(fillDict['value']) + " " + updateColumns[1] + " = " + str(fillDict['fill_number']) + " WHERE year = " + str(rowID) + " AND runtime_type_id = " + str(collType)
-        #cursor.execute(prompt, (fillDict['value'], fillDict['fill_number'], rowID, collType))
         prompt_print = prompt
+        # prompt = "UPDATE " + tableName + " SET " + updateColumns[0] + "=%s " + updateColumns[1] + "=%s WHERE year =%s AND runtime_type_id =%s"
+        #cursor.execute(prompt, (fillDict['value'], fillDict['fill_number'], rowID, collType))
 
     print prompt_print
 
@@ -152,13 +188,16 @@ def checkAndUpdateDBvalues(fillSummary, year, collType):
     # Now compare database values with new values
 
     for newDataDict in fillSummary:
-        attributeName = FillRequest2DBtableDict[newDataDict['field']]
+        attributeName = newDataDict['field']
+        if('day' not in attributeName and 'week' not in attributeName and 'month' not in attributeName):
+            attributeName = FillRequest2DBtableDict[newDataDict['field']]
         # print attributeName
         DBvalue = yearSummary[attributeName]
         fillValue = newDataDict['value']
         if(DBvalue is None or fillValue is None):
             continue
-        if(attributeName == 'longestfill_hours' or attributeName == 'fastest_beam_turnaround_hours'):
+        # if(attributeName == 'longestfill_hours' or attributeName == 'fastest_beam_turnaround_hours' or attributeName == 'longestday_hours'):
+        if('_hours' in attributeName):
             #int() to ensure the values are integer seconds
             DBvalue = int(yearSummary[attributeName]*3600)
             if(fillValue == ''):
@@ -172,6 +211,13 @@ def checkAndUpdateDBvalues(fillSummary, year, collType):
 
     #con.commit()
     db.close()
+
+def UpdateDayFill(fillData, SummaryFields, collType, year):
+    FillStatistics = fillStats.FillStats(fillData, SummaryFields, collType)
+    FillSummary = FillStatistics.getDayIntervalSummary(year)
+
+    checkAndUpdateDBvalues(FillSummary, year, collType)
+
 
 def UpdateFill(fillData, SummaryFields, collType, year):
     if(checkFillEnd(fillData)):
