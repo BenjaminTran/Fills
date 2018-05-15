@@ -86,8 +86,6 @@ def updateDBvalue(cursor, fillDict, rowID, collType, tableName, columnName):
     # elif(columnName == 'maxpileup'):
         # updateColumns = [columnName, columnName + '_fill']
         # prompt = "UPDATE " + tableName + " SET " + updateColumns[0] + "=:1, " + updateColumns[1] + "=:2 WHERE year =:3 AND runtime_type_id =:4"
-        # prompt_print = prompt
-        # cursor.execute(prompt, (fillDict['value'], fillDict['fill_number'], rowID, collType))
 
     else: # Does not have datetime field
         updateColumns = [columnName, columnName + '_fill']
