@@ -1,3 +1,4 @@
+import pytz
 import argparse
 import datetime
 import fills
@@ -26,11 +27,12 @@ def fillRequest(args):
 
     return fillData
 
-def lumiRequest(args,beginTime,endTime):
-    api = fills.OmsApi(args.server, debug = True)
-    if args.year:
-        lumiData = api.getOmsObject( 'lumisections',
-                filters = [ ['start_time', 'GE', beginTime.isoformat() + 'Z'], ['end_time','LE',endTime.isoformat() + 'Z']])
+def lumiRequest(beginTime,endTime,server):
+    api = fills.OmsApi(server, debug = True)
+    beginTime_tzNone = beginTime.replace(tzinfo=None)
+    endTime_tzNone = endTime.replace(tzinfo=None)
+    lumiData = api.getOmsObject( 'lumisections',
+            filters = [ ['start_time', 'GE', beginTime_tzNone.isoformat() + 'Z'], ['end_time','LE',endTime_tzNone.isoformat() + 'Z']])
 
     return lumiData
 

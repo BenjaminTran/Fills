@@ -17,10 +17,10 @@ if fillData:
     # Acceptable collType names = ALL | PROTONS | PROTONS_PB | PB
     if(args.collType == "ALL"):
         print "="*10 + "PROTONS PROTONS PROTONS" + "="*10
-        updateDB.UpdateFill(fillData, SummaryFields, "PROTONS", args.year)
+        updateDB.UpdateFill(fillData, SummaryFields, "PROTONS", args)
         print "="*10 + "PROTONS_PB PROTONS_PB PROTONS_PB" + "="*10
-        updateDB.UpdateFill(fillData, SummaryFields, "PROTONS_PB", args.year)
+        updateDB.UpdateFill(fillData, SummaryFields, "PROTONS_PB", args)
         print "="*10 + "PB PB PB" + "="*30
-        updateDB.UpdateFill(fillData, SummaryFields, "PB", args.year)
+        updateDB.UpdateFill(fillData, SummaryFields, "PB", args)
     else:
-        updateDB.UpdateFill(fillData, SummaryFields, args.collType, args.year)
+        updateDB.UpdateFill(fillData, SummaryFields, args.collType, args)
