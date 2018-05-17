@@ -48,7 +48,8 @@ class FillStats:
         """
         get the maximum value of a specified field
         """
-        maxField = [0,0,0]
+        # last entry is only used for efficiency for recorded_lumi
+        maxField = [0,0,0,0]
         result = {}
         if field:
             for dict1 in fillData['data']:
@@ -57,13 +58,14 @@ class FillStats:
                 value = dict2[field]
                 time_unf = dateutil.parser.parse(dict2['start_stable_beam'])
                 # time = FillStats.formatDate(time_unf)
-                tmp = [fillNum,value,time_unf]
+                tmp = [fillNum,value,time_unf,dict2['efficiency_lumi']]
                 if maxField[1] < tmp[1]:
                     maxField = tmp
             result['field'] = field
             result['fill_number'] = maxField[0]
             result['value'] = maxField[1]
             result['start_stable_beam'] = maxField[2]
+            result['efficiency_lumi'] = maxField[3]
             # print result
             return result
         return {}
@@ -293,7 +295,6 @@ class FillStats:
             elif(increment == 'month'):
                 timeIncrement = relativedelta(days=1, day=31)
 
-        # while(end.replace(tzinfo=pytz.UTC) - incrementalCheck).days > -1:
         while(end.date() - incrementalCheck.date()).days > -1:
             print Number
             print "IC: " + str(incrementalCheck)
@@ -309,6 +310,40 @@ class FillStats:
             incrementalCheck += timeIncrement
 
         result = {'field' : field, 'Num' : maxNumber, 'value' : maxValue}
+
+        return result
+
+    def getIntervalEfficiency(self, year, increment, dateID):
+        """
+        Get efficiency for intervaled maximum recorded lumi
+        """
+        result = 0
+        begin_date = datetime.datetime(year,1,1,0,0,0,0)
+        end_date = datetime.datetime(year,12,31,23,59,59,0)
+        timeIncrement = datetime.timedelta(days=0)
+        if(increment == 'day'):
+            begin_date += datetime.timedelta(days=(dateID)-1)
+            timeIncrement = datetime.timedelta(days=1)
+        elif(increment == 'week'):
+            begin_date += relativedelta(weekday=MO(1))
+            begin_date += relativedelta(weeks=dateID-1)
+            timeIncrement = datetime.timedelta(weeks=1)
+        elif(increment == 'month'):
+            begin_date += relativedelta(months=dateID-1)
+            timeIncrement = relativedelta(days=1, day=31)
+
+        incrementalCheck = begin_date
+
+        rec_lumi = 0
+        del_lumi = 0
+        while(incrementalCheck + timeIncrement > begin_date):
+            rec_lumi += self.sumDay(begin_date,'maxlumirecorded')
+            del_lumi += self.sumDay(begin_date,'maxlumi')
+            begin_date += datetime.timedelta(days=1)
+
+        eff = rec_lumi/del_lumi
+
+        result = [{'field' : 'maxlumi' + increment + '_eff', 'value' : eff}]
 
         return result
 
