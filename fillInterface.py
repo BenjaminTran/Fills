@@ -16,14 +16,19 @@ def argParser():
     return args
 
 
-def fillRequest(args):
+def fillRequest(args, filters, fields):
     api = fills.OmsApi( args.server, debug = True )
-    if args.year:
-        Jan1 = datetime.datetime( args.year, 1, 1 )
-        Dec31 = datetime.datetime( args.year, 12, 31 )
-        fillData = api.getOmsObject( 'fills',
-                  filters = [ [ 'start_time', 'GT', Jan1.isoformat() + 'Z'], [ 'start_time', 'LT', Dec31.isoformat() + 'Z'], ['start_stable_beam', 'NEQ', 'null'] ],
-                  fields = ['fill_type_runtime','fill_number','peak_lumi','peak_pileup','efficiency_lumi','bunches_target','bunches_colliding','start_stable_beam','start_time','end_time','to_ready_time','delivered_lumi','recorded_lumi']   )
+    # if args.year:
+    fillData = api.getOmsObject( 'fills',
+              filters,
+              fields)
+
+    print fillData
+    return fillData
+
+def fillRequestList(args, filters, fields):
+    api = fills.OmsApi(args.server, debug = True)
+    fillData = api.getRows('fills', filters, fields)
 
     return fillData
 
@@ -35,5 +40,3 @@ def lumiRequest(beginTime,endTime,server):
             filters = [ ['start_time', 'GE', beginTime_tzNone.isoformat() + 'Z'], ['end_time','LE',endTime_tzNone.isoformat() + 'Z']])
 
     return lumiData
-
-

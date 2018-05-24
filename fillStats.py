@@ -158,8 +158,29 @@ class FillStats:
         fill_list = fillData['data']
         for dict1 in fill_list[:]:
             dict2 = dict1['attributes']
-            if(dict2['fill_type_runtime'] != collision_type):
+            if(dict2.get('fill_type_runtime') and dict2['fill_type_runtime'] != collision_type):
                 fillData['data'].remove(dict1)
+        return fillData
+
+    @staticmethod
+    def getTime(timeObject):
+        if timeObject == None:
+            print 'bad timeObject'
+        return dateutil.parser.parse(timeObject)
+
+    # @staticmethod
+    def filterDateResponse(self, fillData, lower, upper):
+        lower = lower.replace(tzinfo=pytz.UTC)
+        upper = upper.replace(tzinfo=pytz.UTC)
+        fill_list = fillData['data']
+        for dict1 in fill_list[:]:
+            dict2 = dict1['attributes']
+            if(dict2['end_time'] == None):
+                continue
+            if(self.getTime(dict2['end_time']) < lower or self.getTime(dict2['start_time']) > upper):
+            # if(self.getTime(dict2['end_time']) < lower or self.getTime(dict2['start_stable_beam']) > upper):
+                fillData['data'].remove(dict1)
+        print fillData
         return fillData
 
     @staticmethod
@@ -169,8 +190,6 @@ class FillStats:
         """
         lumi_delivered = 0
         lumi_recorded = 0
-        largestLS = 0
-        fillNum = 0
         if lumiData and len(lumiData['data']) > 0:
             if('recorded' in field):
                 lumi_recorded = lumiData['data'][0]['attributes']['recorded_lumi']
@@ -187,32 +206,45 @@ class FillStats:
         else:
             return 0
 
+    @staticmethod
+    def calcDuration(dateUTC,DiffDay_begin,DiffDay_end,begin_time,end_time):
+        result = 0
+        beginning_day = datetime.datetime(dateUTC.year,dateUTC.month,dateUTC.day,0,0,0,0,pytz.UTC)
+        ending_day = datetime.datetime(dateUTC.year,dateUTC.month,dateUTC.day,23,59,59,0,pytz.UTC)
+        if(DiffDay_begin < 0):
+            result += (end_time - beginning_day).total_seconds()/3600
+        # Fill ended the next day
+        elif(DiffDay_end > 0):
+            result += (ending_day - begin_time).total_seconds()/3600
+        # Fill started and ended the same day
+        else:
+            result += (end_time - begin_time).total_seconds()/3600
+        return result
 
-    def sumDay(self, date, field):
+
+    def sumDay(self, fillData, date, field):
         """
         Sum a field for a given day.
         """
         result = 0
         result_recorded = 0
+        end_time = 0
         dateUTC = date.replace(tzinfo=pytz.UTC)
-        for dict1 in self.fillData['data']:
+        for dict1 in fillData['data']:
             dict2 = dict1['attributes']
+            # for fills that have not ended yet
             if(dict2['end_time'] == None):
-                continue
-            end_time = dateutil.parser.parse(dict2['end_time'])#.replace(tzinfo=pytz.UTC)
-            begin_time = dateutil.parser.parse(dict2['start_stable_beam'])#.replace(tzinfo=pytz.UTC)
+                today = datetime.datetime.today()
+                end_time = datetime.datetime(today.year, today.month, today.day, 23,59,59,0,pytz.UTC)
+            else:
+                end_time = dateutil.parser.parse(dict2['end_time'])#.replace(tzinfo=pytz.UTC)
+            begin_time = dateutil.parser.parse(dict2['start_stable_beam']).replace(tzinfo=None)
             beginning_day = datetime.datetime(dateUTC.year,dateUTC.month,dateUTC.day,0,0,0,0,pytz.UTC)
             ending_day = datetime.datetime(dateUTC.year,dateUTC.month,dateUTC.day,23,59,59,0,pytz.UTC)
             DiffDay_begin = (begin_time.date() - dateUTC.date()).days
             DiffDay_end = (end_time.date() - dateUTC.date()).days
-            sameDay = True
-            if(end_time.date() == dateUTC.date() and begin_time.date() == dateUTC.date()):
-                sameDay = True
-            else:
-                sameDay = False
 
             # if fill has started and ended the day before and after
-            # if(DiffDay_begin == -1 and DiffDay_end == 1):
             if(DiffDay_begin < 0 and DiffDay_end > 0):
                 if('longest' in field and dict2['delivered_lumi'] > 0):
                     result += 24
@@ -222,60 +254,49 @@ class FillStats:
                     lumiData_beg = fillInterface.lumiRequest(beginning_day,beginning_day + datetime.timedelta(seconds=60),self.args.server)
                     if lumiData_end and lumiData_beg:
                         result = self.lumiParser(lumiData_end,field) - self.lumiParser(lumiData_beg,field)
-                        print "FILL " + str(dict2['fill_number']) +  " WHOLE DAY " + str(result)
                         return result
 
             # Fills ending or starting on the day
             if(end_time.date() == dateUTC.date() or begin_time.date() == dateUTC.date()):
                 if('longest' in field and dict2['delivered_lumi'] > 0):
                     # Fill started the day before
-                    if(DiffDay_begin < 0):
-                        result += (end_time - beginning_day).total_seconds()/3600
-                        print str((end_time - beginning_day).total_seconds()/3600) + " " + str(dict2['fill_number'])
-
-                    # Fill ended the next day
-                    elif(DiffDay_end > 0):
-                        result += (ending_day - begin_time).total_seconds()/3600
-
-                        print str((ending_day - begin_time).total_seconds()/3600) + " " + str(dict2['fill_number'])
-                    # Fill started and ended the same day
-                    elif(sameDay):
-                        result += (end_time - begin_time).total_seconds()/3600
-                        print str((end_time - begin_time).total_seconds()/3600) + " " + str(dict2['fill_number'])
+                    if(dict2['end_time'] == None):
+                        result += (datetime.datetime.now() - begin_time).total_seconds()/3600
+                    else:
+                        result += self.calcDuration(dateUTC,DiffDay_begin,DiffDay_end,begin_time,end_time)
                 else:
                     recorded_lumi = dict2['recorded_lumi']
                     delivered_lumi = dict2['delivered_lumi']
                     # Fill started the day before
                     if(DiffDay_begin < 0):
                         lumiData = fillInterface.lumiRequest(beginning_day,beginning_day + datetime.timedelta(minutes=1),self.args.server)
-                        if('maxlumirecorded' in field):
-                            result += dict2['recorded_lumi'] - self.lumiParser(lumiData,field)
-                            print "(before) Fill Number: " + str(dict2['fill_number']) + " Date: " + str(end_time) + str(dict2['recorded_lumi'] - self.lumiParser(lumiData,field))
+                        if('recorded' in field):
+                            result += recorded_lumi - self.lumiParser(lumiData,field)
                         else:
-                            result += dict2['delivered_lumi'] - self.lumiParser(lumiData,field)
-                            print "(before) Fill Number: " + str(dict2['fill_number']) + " Date: " + str(end_time) + str(dict2['delivered_lumi'] - self.lumiParser(lumiData,field))
+                            result += delivered_lumi - self.lumiParser(lumiData,field)
+                            print dict2['fill_number']
+                            print result
 
                     # Fill ended the next day
                     elif(DiffDay_end > 0):
-                        # lumiData = fillInterface.lumiRequest(ending_day + datetime.timedelta(seconds=1),ending_day + datetime.timedelta(seconds=40))
-                        lumiData = fillInterface.lumiRequest(ending_day,ending_day + datetime.timedelta(seconds=60),self.args.server)
+                        lumiData = fillInterface.lumiRequest(ending_day,ending_day + datetime.timedelta(minutes=1),self.args.server)
                         result += self.lumiParser(lumiData,field)
-                        print "(next) Fill Number: " + str(dict2['fill_number']) + " " + str(self.lumiParser(lumiData,field))
+                        print dict2['fill_number']
+                        print result
 
                     # Fill started and ended the same day
-                    elif(sameDay):
-                        if('maxlumirecorded' in field):
-                            result += dict2['recorded_lumi']
-                            print "Fill Number: " + str(dict2['fill_number']) + " " + str(dict2['recorded_lumi'])
+                    else:
+                        if('recorded' in field):
+                            result += recorded_lumi
                         else:
-                            result += dict2['delivered_lumi']
-                            print "(same) Fill Number: " + str(dict2['fill_number']) + " " + str(dict2['delivered_lumi'])
-                    print "Day result: " + str(result)
+                            result += delivered_lumi
+                            print dict2['fill_number']
+                            print result
 
         return result
 
 
-    def sumByInterval(self, begin, end, increment, field):
+    def sumByInterval(self, fillData, begin, end, increment, field):
         """
         Calculate the given statistic by an increment(string or int) over a time period.
         """
@@ -300,7 +321,8 @@ class FillStats:
             print "IC: " + str(incrementalCheck)
             summedValue = 0
             while(incrementalCheck + timeIncrement > begin_UTC):
-                summedValue += self.sumDay(begin_UTC,field)
+                summedValue += self.sumDay(fillData, begin_UTC,field)
+                print "summed Value"
                 print summedValue
                 begin_UTC += datetime.timedelta(days=1)
             if(summedValue > maxValue):
@@ -313,7 +335,21 @@ class FillStats:
 
         return result
 
-    def getIntervalEfficiency(self, year, increment, dateID):
+    def getTableSummary(self, begin, end, increment, fields = None):
+        """
+        get summary values for WEEKLY or DAILY Tables
+        """
+        result_list = []
+        fields2parse = fields
+        if fields is None:
+            fields2parse = self.Fields
+        for field in fields2parse:
+            result_list.append(self.sumByInterval(self.fillData,begin,end,increment,field))
+        result_list.append(self.getMaxValue(self.fillData,'peak_lumi'))
+
+        return result_list
+
+    def getIntervalEfficiency(self, year, increment, intervalID):
         """
         Get efficiency for intervaled maximum recorded lumi
         """
@@ -322,23 +358,23 @@ class FillStats:
         end_date = datetime.datetime(year,12,31,23,59,59,0)
         timeIncrement = datetime.timedelta(days=0)
         if(increment == 'day'):
-            begin_date += datetime.timedelta(days=(dateID)-1)
+            begin_date += datetime.timedelta(days=(intervalID)-1)
             timeIncrement = datetime.timedelta(days=1)
         elif(increment == 'week'):
             begin_date += relativedelta(weekday=MO(1))
-            begin_date += relativedelta(weeks=dateID-1)
+            begin_date += relativedelta(weeks=intervalID-1)
             timeIncrement = datetime.timedelta(weeks=1)
         elif(increment == 'month'):
-            begin_date += relativedelta(months=dateID-1)
+            begin_date += relativedelta(months=intervalID-1)
             timeIncrement = relativedelta(days=1, day=31)
 
         incrementalCheck = begin_date
 
         rec_lumi = 0
-        del_lumi = 0
+        del_lumi = 1
         while(incrementalCheck + timeIncrement > begin_date):
-            rec_lumi += self.sumDay(begin_date,'maxlumirecorded')
-            del_lumi += self.sumDay(begin_date,'maxlumi')
+            rec_lumi += self.sumDay(self.fillData,begin_date,'maxlumirecorded')
+            del_lumi += self.sumDay(self.fillData,begin_date,'maxlumi')
             begin_date += datetime.timedelta(days=1)
 
         eff = rec_lumi/del_lumi
@@ -354,9 +390,9 @@ class FillStats:
         begin_date = datetime.datetime(year,1,1,0,0,0,0)
         end_date = datetime.datetime(year,12,31,23,59,59,0)
         result_list = []
-        result_list.append(self.sumByInterval(begin_date, end_date, 'day', 'maxlumiday'))
-        result_list.append(self.sumByInterval(begin_date, end_date, 'day', 'maxlumirecordedday'))
-        result_list.append(self.sumByInterval(begin_date, end_date, 'day', 'longestday_hours'))
+        result_list.append(self.sumByInterval(self.fillData,begin_date, end_date, 'day', 'maxlumiday'))
+        result_list.append(self.sumByInterval(self.fillData,begin_date, end_date, 'day', 'maxlumirecordedday'))
+        result_list.append(self.sumByInterval(self.fillData,begin_date, end_date, 'day', 'longestday_hours'))
 
         return result_list
 
@@ -367,9 +403,9 @@ class FillStats:
         begin_date = datetime.datetime(year,1,1,0,0,0,0) + relativedelta(weekday=MO(1))
         end_date = datetime.datetime(year,12,31,23,59,59,0)
         result_list = []
-        result_list.append(self.sumByInterval(begin_date, end_date, 'week', 'maxlumiweek'))
-        result_list.append(self.sumByInterval(begin_date, end_date, 'week', 'maxlumirecordedweek'))
-        result_list.append(self.sumByInterval(begin_date, end_date, 'week', 'longestweek_hours'))
+        result_list.append(self.sumByInterval(self.fillData,begin_date, end_date, 'week', 'maxlumiweek'))
+        result_list.append(self.sumByInterval(self.fillData,begin_date, end_date, 'week', 'maxlumirecordedweek'))
+        result_list.append(self.sumByInterval(self.fillData,begin_date, end_date, 'week', 'longestweek_hours'))
 
         return result_list
 
@@ -380,9 +416,9 @@ class FillStats:
         begin_date = datetime.datetime(year,1,1,0,0,0,0)
         end_date = datetime.datetime(year,12,31,23,59,59,0)
         result_list = []
-        result_list.append(self.sumByInterval(begin_date, end_date, 'month', 'maxlumimonth'))
-        result_list.append(self.sumByInterval(begin_date, end_date, 'month', 'maxlumirecordedmonth'))
-        result_list.append(self.sumByInterval(begin_date, end_date, 'month', 'longestmonth_hours'))
+        result_list.append(self.sumByInterval(self.fillData,begin_date, end_date, 'month', 'maxlumimonth'))
+        result_list.append(self.sumByInterval(self.fillData,begin_date, end_date, 'month', 'maxlumirecordedmonth'))
+        result_list.append(self.sumByInterval(self.fillData,begin_date, end_date, 'month', 'longestmonth_hours'))
 
         return result_list
 
