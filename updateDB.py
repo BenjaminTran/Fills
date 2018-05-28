@@ -272,9 +272,9 @@ def UpdateFill(fillData, SummaryFields, collType, args,interval,intervalID,table
     checkAndUpdateDBvalues(FillSummary,tableName, args.year, collType,intervalID)
     checkAndUpdateDBvalues(IntervalEff,tableName, args.year, collType,intervalID)
 
-def UpdateTable(begin, end, fillData, SummaryFields, collType, args,increment):
+def UpdateTable(begin, end, fillData, SummaryFields, collType, args,increment,sum77 = False):
     FillStatistics = fillStats.FillStats(args, fillData, SummaryFields, collType)
-    FillSummary = FillStatistics.getTableSummary(begin,end,increment)
+    FillSummary = FillStatistics.getTableSummary(begin,end,increment,None,sum77)
 
     print FillSummary
 

@@ -209,8 +209,8 @@ class FillStats:
     @staticmethod
     def calcDuration(dateUTC,DiffDay_begin,DiffDay_end,begin_time,end_time):
         result = 0
-        beginning_day = datetime.datetime(dateUTC.year,dateUTC.month,dateUTC.day,0,0,0,0,pytz.UTC)
-        ending_day = datetime.datetime(dateUTC.year,dateUTC.month,dateUTC.day,23,59,59,0,pytz.UTC)
+        beginning_day = datetime.datetime(dateUTC.year,dateUTC.month,dateUTC.day,0,0,0,0)
+        ending_day = datetime.datetime(dateUTC.year,dateUTC.month,dateUTC.day,23,59,59,0)
         if(DiffDay_begin < 0):
             result += (end_time - beginning_day).total_seconds()/3600
         # Fill ended the next day
@@ -221,26 +221,33 @@ class FillStats:
             result += (end_time - begin_time).total_seconds()/3600
         return result
 
-
-    def sumDay(self, fillData, date, field):
+    def sumDay(self, fillData, date, field, sum77 = False):
         """
-        Sum a field for a given day.
+        Sum a field for a given day. sum77 refers to daily77 table which needs to define the
+        beginning of the day as 0700
         """
         result = 0
         result_recorded = 0
         end_time = 0
         dateUTC = date.replace(tzinfo=pytz.UTC)
+        dateUTC77 = dateUTC + relativedelta(days=1)
         for dict1 in fillData['data']:
             dict2 = dict1['attributes']
             # for fills that have not ended yet
             if(dict2['end_time'] == None):
                 today = datetime.datetime.today()
-                end_time = datetime.datetime(today.year, today.month, today.day, 23,59,59,0,pytz.UTC)
+                if(sum77):
+                    end_time = datetime.datetime(today.year, today.month, today.day, 7,0,0,0,pytz.UTC)
+                else:
+                    end_time = datetime.datetime(today.year, today.month, today.day, 23,59,59,0,pytz.UTC)
             else:
-                end_time = dateutil.parser.parse(dict2['end_time'])#.replace(tzinfo=pytz.UTC)
+                end_time = dateutil.parser.parse(dict2['end_time']).replace(tzinfo=None)
             begin_time = dateutil.parser.parse(dict2['start_stable_beam']).replace(tzinfo=None)
             beginning_day = datetime.datetime(dateUTC.year,dateUTC.month,dateUTC.day,0,0,0,0,pytz.UTC)
             ending_day = datetime.datetime(dateUTC.year,dateUTC.month,dateUTC.day,23,59,59,0,pytz.UTC)
+            if(sum77):
+                beginning_day = datetime.datetime(dateUTC.year,dateUTC.month,dateUTC.day,7,0,0,0,pytz.UTC)
+                ending_day = datetime.datetime(dateUTC77.year,dateUTC77.month,dateUTC77.day,7,0,0,0,pytz.UTC)
             DiffDay_begin = (begin_time.date() - dateUTC.date()).days
             DiffDay_end = (end_time.date() - dateUTC.date()).days
 
@@ -296,7 +303,7 @@ class FillStats:
         return result
 
 
-    def sumByInterval(self, fillData, begin, end, increment, field):
+    def sumByInterval(self, fillData, begin, end, increment, field,sum77 = False):
         """
         Calculate the given statistic by an increment(string or int) over a time period.
         """
@@ -321,7 +328,7 @@ class FillStats:
             print "IC: " + str(incrementalCheck)
             summedValue = 0
             while(incrementalCheck + timeIncrement > begin_UTC):
-                summedValue += self.sumDay(fillData, begin_UTC,field)
+                summedValue += self.sumDay(fillData, begin_UTC,field,sum77)
                 print "summed Value"
                 print summedValue
                 begin_UTC += datetime.timedelta(days=1)
@@ -335,7 +342,7 @@ class FillStats:
 
         return result
 
-    def getTableSummary(self, begin, end, increment, fields = None):
+    def getTableSummary(self, begin, end, increment, fields = None, sum77 = False):
         """
         get summary values for WEEKLY or DAILY Tables
         """
@@ -344,7 +351,7 @@ class FillStats:
         if fields is None:
             fields2parse = self.Fields
         for field in fields2parse:
-            result_list.append(self.sumByInterval(self.fillData,begin,end,increment,field))
+            result_list.append(self.sumByInterval(self.fillData,begin,end,increment,field,sum77))
         result_list.append(self.getMaxValue(self.fillData,'peak_lumi'))
 
         return result_list
