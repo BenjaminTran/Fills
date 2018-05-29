@@ -4,9 +4,10 @@ import fillStats
 import updateDB
 import fillInterface
 import datetime
+import pytz
 
 args = fillInterface.argParser()
-begin = datetime.datetime( args.year, 1, 1 )
+begin = datetime.datetime( args.year, 1, 1)
 end = datetime.datetime( args.year, 12, 31 )
 filters = [ [ 'start_time', 'GT', begin.isoformat() + 'Z'], [ 'start_time', 'LT', end.isoformat() + 'Z'], ['start_stable_beam', 'NEQ', 'null'] ]
 fields = ['fill_type_runtime','fill_number','peak_lumi','peak_pileup','efficiency_lumi','bunches_colliding','start_stable_beam','start_time','end_time','delivered_lumi','recorded_lumi']

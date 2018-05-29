@@ -40,3 +40,22 @@ def lumiRequest(beginTime,endTime,server):
             filters = [ ['start_time', 'GE', beginTime_tzNone.isoformat() + 'Z'], ['end_time','LE',endTime_tzNone.isoformat() + 'Z']])
 
     return lumiData
+
+def checkPreviousFill(beginTime,endTime,server):
+    """
+    if fill is ongoing into the day of interest specified in beginTime,
+    return fill number for that fill
+    """
+    fillNumber = 0
+    api = fills.OmsApi(server, debug = True)
+    beginTime_tzNone = beginTime.replace(tzinfo=None)
+    endTime_tzNone = endTime.replace(tzinfo=None)
+    lumiData = api.getRows( 'lumisections',
+            filters = [ ['start_time', 'GE', beginTime_tzNone.isoformat() + 'Z'], ['end_time','LE',endTime_tzNone.isoformat() + 'Z']],
+            fields = ['fill_number'])
+    if lumiData:
+        fillNumber = lumiData[0]['fill_number']
+        print lumiData
+
+
+    return fillNumber
