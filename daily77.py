@@ -10,11 +10,11 @@ import cx_Oracle
 args = fillInterface.argParser()
 today = datetime.datetime.today()
 yesterday = today - datetime.timedelta(days=1)
-time_low = datetime.datetime(yesterday.year, yesterday.month, yesterday.day,7,0,0,0)
+time_low = fillStats.local2UTC(datetime.datetime(yesterday.year, yesterday.month, yesterday.day,7,0,0,0))
 print time_low
 dayNumber = datetime.datetime.today().timetuple().tm_yday
 print dayNumber
-time_high = datetime.datetime(today.year, today.month, today.day, 7, 0, 0, 0)
+time_high = fillStats.local2UTC(datetime.datetime(today.year, today.month, today.day, 7, 0, 0, 0))
 
 filters = [ ['start_stable_beam', 'NEQ', 'null'] ]
 fields = ['fill_type_runtime','fill_number','peak_lumi','efficiency_lumi','start_stable_beam','start_time','end_time','delivered_lumi','recorded_lumi','duration']

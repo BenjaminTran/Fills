@@ -281,18 +281,10 @@ def UpdateTable(begin, end, fillData, SummaryFields, collType, args,increment,su
 def UpdateDailyTable(begin, end, fillData, SummaryFields, collType, args,increment):
     ResultList = []
     FillStatistics = fillStats.FillStats(args, fillData, SummaryFields, collType)
-    # FillSummary = FillStatistics.getTableSummary(begin,end,increment,['longest_stable_beam'])
     for field in SummaryFields:
         value = FillStatistics.lumiParser(fillData,field)
         result = {field,value}
         ResultList.append(result)
-
-    # for resultDict in FillSummary:
-        # field = resultDict['field']
-        # if(field == 'longest_stable_beam'):
-            # ResultList.append({field : resultDict['value']})
-        # elif(field == 'peak_lumi'):
-            # ResultList.append({field : resultDict['value']})
 
     print ResultList
 

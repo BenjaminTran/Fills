@@ -7,6 +7,13 @@ import fillInterface
 from dateutil.relativedelta import *
 from pytz import timezone
 
+def local2UTC(timestamp):
+    local_timezone = pytz.timezone("Europe/Zurich")
+    UTC_timezone = pytz.timezone("UTC")
+    altered_timestamp = local_timezone.localize(timestamp).astimezone(UTC_timezone)
+    converted_timestamp = altered_timestamp.replace(tzinfo=None)
+    return converted_timestamp
+
 class FillStats:
     """
     Functions for calculating fill statistics
@@ -207,96 +214,24 @@ class FillStats:
             return 0
 
     @staticmethod
-    def calcDuration(dateUTC,DiffDay_begin,DiffDay_end,begin_time,end_time,sum77 = False):
+    def calcDuration(dateUTC,DiffDay_begin,DiffDay_end,DiffDay_begin77,DiffDay_end77,begin_time,end_time,sum77 = False):
         result = 0
         dateUTC_Tom = dateUTC + relativedelta(days=1)
         beginning_day = datetime.datetime(dateUTC.year,dateUTC.month,dateUTC.day,0,0,0,0)
         ending_day = datetime.datetime(dateUTC.year,dateUTC.month,dateUTC.day,23,59,59,0)
         if(sum77):
-            beginning_day = datetime.datetime(dateUTC.year,dateUTC.month,dateUTC.day,7,0,0,0)
-            ending_day = datetime.datetime(dateUTC_Tom.year,dateUTC_Tom.month,dateUTC_Tom.day,7,0,0,0)
+            beginning_day = local2UTC(datetime.datetime(dateUTC.year,dateUTC.month,dateUTC.day,7,0,0,0))
+            ending_day = beginning_day + relativedelta(days=1)
 
-        if(DiffDay_begin < 0):
+        if(DiffDay_begin < 0 or (DiffDay_begin77 < 0 and sum77)):
             result += (end_time - beginning_day).total_seconds()/3600
         # Fill ended the next day
-        elif(DiffDay_end > 0):
+        elif(DiffDay_end > 0 or (DiffDay_end77 > 0 and sum77)):
             result += (ending_day - begin_time).total_seconds()/3600
         # Fill started and ended the same day
         else:
             result += (end_time - begin_time).total_seconds()/3600
         return result
-
-    def sumDay77(self, fillData, dateUTC, field):
-        result = 0
-        end_time = 0
-        today = datetime.datetime.today()
-        dateUTC = dateUTC.replace(tzinfo=None)
-        dateUTC_Tom = dateUTC + datetime.timedelta(days=1)
-        print dateUTC
-        print dateUTC_Tom
-        for dict1 in fillData['data']:
-            dict2 = dict1['attributes']
-            if(dict2['end_time'] == None):
-                end_time = datetime.datetime(today.year,today.month,today.day,7,0,0,0)
-            else:
-                end_time = dateutil.parser.parse(dict2['end_time']).replace(tzinfo=None)
-            begin_time = dateutil.parser.parse(dict2['start_stable_beam']).replace(tzinfo=None)
-            beginning_day = datetime.datetime(dateUTC.year,dateUTC.month,dateUTC.day,7,0,0,0,pytz.UTC)
-            ending_day = beginning_day + relativedelta(days=1)
-            DiffDay_begin = (begin_time - dateUTC).days
-            DiffDay_end = (end_time - dateUTC).days
-
-            if(DiffDay_begin < 0 and DiffDay_end > 0):
-                if('longest' in field and dict2['delivered_lumi'] > 0):
-                    result += 24
-                    return result
-                else:
-                    lumiData_end = fillInterface.lumiRequest(ending_day - datetime.timedelta(seconds=60),ending_day,self.args.server)
-                    lumiData_beg = fillInterface.lumiRequest(beginning_day,beginning_day + datetime.timedelta(seconds=60),self.args.server)
-                    if lumiData_end and lumiData_beg:
-                        result = self.lumiParser(lumiData_end,field) - self.lumiParser(lumiData_beg,field)
-                        return result
-
-            # Fills ending or starting on the day
-            if((end_time - dateUTC).total_seconds > 0 or (begin_time - dateUTC).total_seconds > 0):
-                if('longest' in field and dict2['delivered_lumi'] > 0):
-                    if(dict2['end_time'] == None):
-                        # assuming this is run at 0700 then don't have to worry about the edge
-                        # cases using now()
-                        result += (datetime.datetime.now() - begin_time).total_seconds()/3600
-                    else:
-                        result += self.calcDuration(dateUTC,DiffDay_begin,DiffDay_end,begin_time,end_time,True)
-                else:
-                    recorded_lumi = dict2['recorded_lumi']
-                    delivered_lumi = dict2['delivered_lumi']
-                    # Fill started the day before
-                    if(DiffDay_begin < 0):
-                        lumiData = fillInterface.lumiRequest(beginning_day,beginning_day + datetime.timedelta(minutes=1),self.args.server)
-                        if('recorded' in field):
-                            result += recorded_lumi - self.lumiParser(lumiData,field)
-                        else:
-                            result += delivered_lumi - self.lumiParser(lumiData,field)
-                            print dict2['fill_number']
-                            print result
-
-                    # Fill ended the next day
-                    elif(DiffDay_end > 0):
-                        lumiData = fillInterface.lumiRequest(ending_day,ending_day + datetime.timedelta(minutes=1),self.args.server)
-                        result += self.lumiParser(lumiData,field)
-                        print dict2['fill_number']
-                        print result
-
-                    # Fill started and ended the same day
-                    else:
-                        if('recorded' in field):
-                            result += recorded_lumi
-                        else:
-                            result += delivered_lumi
-                            print dict2['fill_number']
-                            print result
-
-        return result
-
 
     def sumDay(self, fillData, date, field, sum77 = False):
         """
@@ -305,25 +240,28 @@ class FillStats:
         """
         result = 0
         end_time = 0
-        dateUTC = date.replace(tzinfo=pytz.UTC)
-        dateUTC77 = dateUTC + relativedelta(days=1)
-        beginning_day = datetime.datetime(dateUTC.year,dateUTC.month,dateUTC.day,0,0,0,0,pytz.UTC)
+        dateUTC = date.replace(tzinfo=None)
+        if(sum77):
+            beginning_day = local2UTC(datetime.datetime(dateUTC.year,dateUTC.month,dateUTC.day,7,0,0,0))
+        else:
+            beginning_day = datetime.datetime(dateUTC.year,dateUTC.month,dateUTC.day,0,0,0,0)
+        # ending_day = beginning_day + relativedelta(days=1,minutes=-1)
+        ending_day = beginning_day + relativedelta(days=1)
+        print ending_day
         # ending_day = datetime.datetime(dateUTC.year,dateUTC.month,dateUTC.day,23,59,59,0,pytz.UTC)
-        ending_day = beginning_day + relativedelta(days=1,minutes=-1)
         for dict1 in fillData['data']:
             dict2 = dict1['attributes']
             # for fills that have not ended yet
             if(dict2['end_time'] == None):
-                today = datetime.datetime.today()
-                if(sum77):
-                    end_time = dateUTC77
-                else:
-                    end_time = datetime.datetime(today.year, today.month, today.day, 23,59,59,0,pytz.UTC)
+                end_time = ending_day
             else:
                 end_time = dateutil.parser.parse(dict2['end_time']).replace(tzinfo=None)
             begin_time = dateutil.parser.parse(dict2['start_stable_beam']).replace(tzinfo=None)
             DiffDay_begin = (begin_time.date() - dateUTC.date()).days
             DiffDay_end = (end_time.date() - dateUTC.date()).days
+            DiffDay_begin77 = (begin_time - dateUTC).total_seconds()
+            DiffDay_end77 = (end_time - (dateUTC + relativedelta(days=1))).total_seconds()
+            print DiffDay_end
 
             # if fill has started and ended the day before and after
             if(DiffDay_begin < 0 and DiffDay_end > 0):
@@ -338,31 +276,45 @@ class FillStats:
                         return result
 
             # Fills ending or starting on the day
-            if(end_time.date() == dateUTC.date() or begin_time.date() == dateUTC.date()):
+            if(((end_time.date() - dateUTC.date()).days == 0 or (begin_time.date() - dateUTC.date()).days == 0) and not sum77) or (((end_time - dateUTC).total_seconds > 0 or (begin_time - dateUTC).total_seconds > 0) and sum77):
                 if('longest' in field and dict2['delivered_lumi'] > 0):
                     # Fill started the day before
                     if(dict2['end_time'] == None):
-                        result += (datetime.datetime.now() - begin_time).total_seconds()/3600
+                        if(sum77 and datetime.datetime.now() > ending_day):
+                            currentDay = datetime.datetime.today()
+                            addition = (local2UTC(datetime.datetime(currentDay.year,currentDay.month,currentDay.day,7,0,0,0)) - begin_time).total_seconds()/3600
+                            result += addition
+                            print addition
+                        else:
+                            result += (datetime.datetime.now() - begin_time).total_seconds()/3600
                     else:
-                        result += self.calcDuration(dateUTC,DiffDay_begin,DiffDay_end,begin_time,end_time)
+                        result += self.calcDuration(dateUTC,DiffDay_begin,DiffDay_end,DiffDay_begin77,DiffDay_end77,begin_time,end_time,sum77)
                 else:
                     recorded_lumi = dict2['recorded_lumi']
                     delivered_lumi = dict2['delivered_lumi']
                     # Fill started the day before
-                    if(DiffDay_begin < 0):
+                    if(DiffDay_begin < 0 or (DiffDay_begin77 < 0 and sum77)):
                         lumiData = fillInterface.lumiRequest(beginning_day,beginning_day + datetime.timedelta(minutes=1),self.args.server)
                         if('recorded' in field):
-                            result += recorded_lumi - self.lumiParser(lumiData,field)
-                        else:
-                            result += delivered_lumi - self.lumiParser(lumiData,field)
+                            addition = recorded_lumi - self.lumiParser(lumiData,field)
+                            result += addition
                             print dict2['fill_number']
+                            print "add | before" + str(addition)
+                            print result
+                        else:
+                            addition = delivered_lumi - self.lumiParser(lumiData,field)
+                            result += addition
+                            print dict2['fill_number']
+                            print "add | before" + str(addition)
                             print result
 
                     # Fill ended the next day
-                    elif(DiffDay_end > 0):
+                    elif(DiffDay_end > 0 or (DiffDay_end77 > 0 and sum77)):
                         lumiData = fillInterface.lumiRequest(ending_day,ending_day + datetime.timedelta(minutes=1),self.args.server)
-                        result += self.lumiParser(lumiData,field)
+                        addition = self.lumiParser(lumiData,field)
+                        result += addition
                         print dict2['fill_number']
+                        print "add | next" + str(addition)
                         print result
 
                     # Fill started and ended the same day
@@ -371,6 +323,7 @@ class FillStats:
                             result += recorded_lumi
                         else:
                             result += delivered_lumi
+                            print "same"
                             print dict2['fill_number']
                             print result
 
@@ -397,15 +350,15 @@ class FillStats:
             elif(increment == 'month'):
                 timeIncrement = relativedelta(days=1, day=31)
 
-        while(end.date() - incrementalCheck.date()).days > -1:
+        while(end.date() - incrementalCheck.date()).days > 0:
             print Number
             print "IC: " + str(incrementalCheck)
             summedValue = 0
             while(incrementalCheck + timeIncrement > begin_UTC):
-                if(sum77):
-                    summedValue += self.sumDay77(fillData, begin_UTC,field)
-                else:
-                    summedValue += self.sumDay(fillData, begin_UTC,field,sum77)
+                # if(sum77):
+                    # summedValue += self.sumDay77(fillData, begin_UTC,field)
+                # else:
+                summedValue += self.sumDay(fillData, begin_UTC,field,sum77)
                 print "summed Value"
                 print summedValue
                 begin_UTC += datetime.timedelta(days=1)
