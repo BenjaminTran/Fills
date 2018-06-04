@@ -31,6 +31,6 @@ fillData = fillInterface.fillRequest(args,filters,fields)
 SummaryFields = ['delivered_lumi','recorded_lumi','longest_stable_beam']
 
 if fillData:
-    updateDB.UpdateTable(time_low,time_high,fillData, SummaryFields,"PROTONS",args,'week')
+    updateDB.InsertIntoTable(time_low,time_high,fillData, SummaryFields,"PROTONS",args,'CMS_RUNTIME_LOGGER.WEEKLY_LUMINOSITY','week')
 else:
     print 'bad'

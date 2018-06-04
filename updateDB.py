@@ -92,12 +92,21 @@ def updateDBvalue(cursor, fillDict, rowID, tableName, columnName):
         prompt = "UPDATE " + tableName + " SET " + updateColumns[0] + "=:1, " + updateColumns[1] + "=:2 WHERE year =:3 AND runtime_type_id =:4"
         cursor.execute(prompt, (fillDict['value'], fillDict['fill_number'], rowID['year'], rowID['runtime_type_id']))
 
-# def insertDBvalue(cursor, fillDict, rowID, collType, tableName, columnName):
-    # """
-    # insert DB values. rowID is a dictionary containing information needed to identify
-    # the row (year, weeknumber, daynumber, collision type, etc.)
-    # """
-    # prompt = "INSERT INTO " + tableName + 
+def insertDBvalue(cursor, fillDict, rowID, tableName):
+    """
+    insert DB values. rowID is a dictionary containing information needed to identify
+    the row (year, weeknumber, daynumber, collision type, etc.)
+    """
+    values = {}
+    for valueDict in fillDict:
+        values[valueDict['field']] = valueDict['value']
+    prompt = ""
+    if(tableName == "CMS_RUNTIME_LOGGER.DAILY_LUMINOSITY" or tableName == "CMS_RUNTIME_LOGGER.DAILY_LUMINOSITY_77"):
+        prompt = "INSERT INTO " + tableName + " (year, day, runtime_type_id, peaklumi, recorded, delivered, lastupdate, duration) VALUES (%s,%s,%s,%s,%s,%s,%s,%s)"
+        cursor.execute(prompt, (rowID['year'],rowID['intervalID'],rowID['runtime_type_id'],valueDict['peak_lumi'],valueDict['recorded_lumi'],valueDict['delivered_lumi'],datetime.datetime.utcnow(),valueDict['longest_stable_beam']))
+    elif(tableName == "CMS_RUNTIME_LOGGER.WEEKLY_LUMINOSITY" or tableName == "CMS_RUNTIME_LOGGER.WEEKLY_LUMINOSITY_WT"):
+        prompt = "INSERT INTO " + tableName + " (year, week, runtime_type_id, peaklumi, recorded, delivered, lastupdate) VALUES (%s,%s,%s,%s,%s,%s,%s)"
+        cursor.execute(prompt, (rowID['year'],rowID['intervalID'],rowID['runtime_type_id'],valueDict['peak_lumi'],valueDict['recorded_lumi'],valueDict['delivered_lumi'],datetime.datetime.utcnow()))
 
 def str2seconds(duration):
     """
@@ -182,6 +191,8 @@ def getTableData(cursor, tableName, year, collType, intervalType, intervalID):
         cursor.execute('select * from ' + tableName + ' where year = ' + str(year) + ' and runtime_type_id = ' + str(runtime_type_id) + ' and week = ' + str(intervalID))
     elif(intervalType == 'daily'):
         cursor.execute('select * from ' + tableName + ' where year = ' + str(year) + ' and runtime_type_id = ' + str(runtime_type_id) + ' and day = ' + str(intervalID))
+    # elif(intervalType == 'daily77'):
+        # cursor.execute('select * from ' + tableName + ' where year = ' + str(year) + ' and runtime_type_id = ' + str(runtime_type_id) + ' and day = ' + str(intervalID))
     else:
         print "invalid intervalType."
         return
@@ -253,16 +264,19 @@ def checkAndUpdateDBvalues(fillSummary, tableName, year, collType, intervalType,
 
 def checkAndInsertDBvalues(fillSummary, tableName, year, collType, intervalType, intervalID = 0):
     """
-    insert into if needed.
+    insert into if needed. intervalID is the week number / day number
     """
     runtime_type_id = getRuntimeTypeID(collType)
     con = connect.cms_wbm_r_online()
     db = dbms.connect.Connection(con, cx_Oracle)
     cursor = db.cursor()
+    rowID = {'year' : year, 'runtime_type_id' : runtime_type_id, 'intervalID' : intervalID}
     summary = getTableData(cursor, tableName, year, collType, intervalType, intervalID)
     if(summary == None):
-        insert
+        updateDB.insertDBvalue(cursor,fillSummary,rowID,tableName)
 
+    # con.commit()
+    db.close()
 
 def UpdateFill(fillData, SummaryFields, collType, args,interval,intervalID,tableName):
     FillStatistics = fillStats.FillStats(args, fillData, SummaryFields, collType)
@@ -272,21 +286,16 @@ def UpdateFill(fillData, SummaryFields, collType, args,interval,intervalID,table
     checkAndUpdateDBvalues(FillSummary,tableName, args.year, collType,intervalID)
     checkAndUpdateDBvalues(IntervalEff,tableName, args.year, collType,intervalID)
 
-def UpdateTable(begin, end, fillData, SummaryFields, collType, args,increment,sum77 = False):
+def InsertIntoTable(begin, end, timeID, fillData, SummaryFields, collType, args,increment,tableName,sum77 = False):
+    """
+    Designed for Daily Daily77 Weekly and Weekly_WT tables
+    """
     FillStatistics = fillStats.FillStats(args, fillData, SummaryFields, collType)
     FillSummary = FillStatistics.getTableSummary(begin,end,increment,None,sum77)
 
+    #checkAndInsertDBvalues
+
     print FillSummary
-
-def UpdateDailyTable(begin, end, fillData, SummaryFields, collType, args,increment):
-    ResultList = []
-    FillStatistics = fillStats.FillStats(args, fillData, SummaryFields, collType)
-    for field in SummaryFields:
-        value = FillStatistics.lumiParser(fillData,field)
-        result = {field,value}
-        ResultList.append(result)
-
-    print ResultList
 
 def UpdateYearFill(fillData, SummaryFields, collType, args):
     if(checkFillEnd(fillData)):

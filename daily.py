@@ -35,4 +35,4 @@ print fillData
 
 SummaryFields = ['delivered_lumi','recorded_lumi','longest_stable_beam']
 
-updateDB.UpdateTable(time_low,time_high,fillData, SummaryFields,"PROTONS",args,'day')
+updateDB.InsertIntoTable(time_low,time_high,fillData, SummaryFields,"PROTONS",args,'CMS_RUNTIME_LOGGER.DAILY_LUMINOSITY','day')

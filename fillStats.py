@@ -203,12 +203,14 @@ class FillStats:
                 if lumi_recorded:
                     return lumi_recorded
                 else:
+                    print lumi_recorded
                     return 0
             else:
                 lumi_delivered = lumiData['data'][0]['attributes']['delivered_lumi']
                 if lumi_delivered:
                     return lumi_delivered
                 else:
+                    print lumi_delivered
                     return 0
         else:
             return 0
@@ -236,7 +238,7 @@ class FillStats:
     def sumDay(self, fillData, date, field, sum77 = False):
         """
         Sum a field for a given day. sum77 refers to daily77 table which needs to define the
-        beginning of the day as 0700
+        beginning of the day as 0700 (local time)
         """
         result = 0
         end_time = 0
